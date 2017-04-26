@@ -78,30 +78,12 @@ def makeMove(state, action):
     pit = findLoc(state, np.array([0,1,0,0]))
     state = np.zeros((4,4,4))
 
-    #up (row - 1)
-    if action==0:
-        new_loc = (player_loc[0] - 1, player_loc[1])
-        if (new_loc != wall):
-            if ((np.array(new_loc) <= (3,3)).all() and (np.array(new_loc) >= (0,0)).all()):
-                state[new_loc][3] = 1
-    #down (row + 1)
-    elif action==1:
-        new_loc = (player_loc[0] + 1, player_loc[1])
-        if (new_loc != wall):
-            if ((np.array(new_loc) <= (3,3)).all() and (np.array(new_loc) >= (0,0)).all()):
-                state[new_loc][3] = 1
-    #left (column - 1)
-    elif action==2:
-        new_loc = (player_loc[0], player_loc[1] - 1)
-        if (new_loc != wall):
-            if ((np.array(new_loc) <= (3,3)).all() and (np.array(new_loc) >= (0,0)).all()):
-                state[new_loc][3] = 1
-    #right (column + 1)
-    elif action==3:
-        new_loc = (player_loc[0], player_loc[1] + 1)
-        if (new_loc != wall):
-            if ((np.array(new_loc) <= (3,3)).all() and (np.array(new_loc) >= (0,0)).all()):
-                state[new_loc][3] = 1
+    actions = [[-1,0],[1,0],[0,-1],[0,1]]
+    #e.g. up => (player row - 1, player column + 0)
+    new_loc = (player_loc[0] + actions[action][0], player_loc[1] + actions[action][1])
+    if (new_loc != wall):
+        if ((np.array(new_loc) <= (3,3)).all() and (np.array(new_loc) >= (0,0)).all()):
+            state[new_loc][3] = 1
 
     new_player_loc = findLoc(state, np.array([0,0,0,1]))
     if (not new_player_loc):
