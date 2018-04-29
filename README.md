@@ -19,16 +19,13 @@ game = Gridworld(size=4, mode='static')
 game.dispGrid()
 ```
 
+```
+array([['+', '-', ' ', 'P'],
+       [' ', 'W', ' ', ' '],
+       [' ', ' ', ' ', ' '],
+       [' ', ' ', ' ', ' ']], dtype='<U2')
 
-
-
-    array([['+', '-', 'P', ' '],
-           [' ', 'W', ' ', ' '],
-           [' ', ' ', ' ', ' '],
-           [' ', ' ', ' ', ' ']],
-          dtype='<U2')
-
-
+```
 
 "P" represents the player, "W" is the wall (an obstacle), and "-" is the pit (a trap that gives a negative reward) and "+" is the goal which gives positive reward and wins the game.
 
