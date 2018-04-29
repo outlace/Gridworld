@@ -3,134 +3,144 @@ import numpy as np
 def randPair(s,e):
     return np.random.randint(s,e), np.random.randint(s,e)
 
-#finds an array in the "depth" dimension of the grid
-def findLoc(state, obj):
-    for i in range(0,4):
-        for j in range(0,4):
-            if (state[i,j] == obj).all():
-                return i,j
+class BoardPiece:
+    
+    def __init__(self, name, code, pos):
+        self.name = name #name of the piece
+        self.code = code #an ASCII character to display on the board
+        self.pos = pos #2-tuple e.g. (1,4)
 
-#Initialize stationary grid, all items are placed deterministically
-def initGrid():
-    state = np.zeros((4,4,4))
-    #place player
-    state[0,1] = np.array([0,0,0,1])
-    #place wall
-    state[2,2] = np.array([0,0,1,0])
-    #place pit
-    state[1,1] = np.array([0,1,0,0])
-    #place goal
-    state[3,3] = np.array([1,0,0,0])
+class GridBoard:
+    
+    def __init__(self, size=4):
+        self.size = size #Board dimensions, e.g. 4 x 4
+        self.components = {} #name : board piece
+    
+    def addPiece(self, name, code, pos=(0,0)):
+        newPiece = BoardPiece(name, code, pos)
+        self.components[name] = newPiece
+    
+    def movePiece(self, name, pos):
+        self.components[name].pos = pos
+    
+    def delPiece(self, name):
+        del self.components['name']
+    
+    def render(self):
+        dtype = '<U2'
+        displ_board = np.zeros((self.size, self.size), dtype=dtype)
+        displ_board[:] = ' '
+        
+        for name, piece in self.components.items():
+            displ_board[piece.pos] = piece.code
+        return displ_board
+    
+    def render_np(self):
+        num_pieces = len(self.components)
+        displ_board = np.zeros((num_pieces, self.size, self.size), dtype=np.uint8)
+        layer = 0
+        for name, piece in self.components.items():
+            pos = (layer,) + piece.pos
+            displ_board[pos] = 1
+            layer += 1
+        return displ_board
+        
+        
+def addTuple(a,b):
+    return tuple([sum(x) for x in zip(a,b)])
+        
+class Gridworld:
+    
+    def __init__(self, size=4, mode='static'):
+        if size >= 4:
+            self.board = GridBoard(size=size)
+        else:
+            print("Minimum board size is 4. Initialized to size 4.")
+            self.board = GridBoard(size=4)
+        
+        #Add pieces, positions will be updated later
+        self.board.addPiece('Player','P',(0,0))
+        self.board.addPiece('Goal','+',(1,0))
+        self.board.addPiece('Pit','-',(2,0))
+        self.board.addPiece('Wall','W',(3,0))
+            
+        if mode == 'static':
+            self.initGridStatic()
+        elif mode == 'player':
+            self.initGridPlayer()
+        else:
+            self.initGridRand()
+    
+    #Initialize stationary grid, all items are placed deterministically
+    def initGridStatic(self):
+        #Setup static pieces
+        self.board.components['Player'].pos = (0,3)
+        self.board.components['Goal'].pos = (0,0)
+        self.board.components['Pit'].pos = (0,1)
+        self.board.components['Wall'].pos = (1,1)
+    
+    #Check if board is initialized appropriately (no overlapping pieces)
+    def validateBoard(self):
+        all_positions = [piece.pos for name,piece in self.board.components.items()]
+        if len(all_positions) > len(set(all_positions)):
+            return False
+        else:
+            return True
 
-    return state
+    #Initialize player in random location, but keep wall, goal and pit stationary
+    def initGridPlayer(self):
+        #height x width x depth (number of pieces)
+        self.initGridStatic()
+        #place player
+        self.board.components['Player'].pos = randPair(0,self.board.size)
 
-#Initialize player in random location, but keep wall, goal and pit stationary
-def initGridPlayer():
-    state = np.zeros((4,4,4))
-    #place player
-    state[randPair(0,4)] = np.array([0,0,0,1])
-    #place wall
-    state[2,2] = np.array([0,0,1,0])
-    #place pit
-    state[1,1] = np.array([0,1,0,0])
-    #place goal
-    state[1,2] = np.array([1,0,0,0])
+        if (not self.validateBoard()):
+            #print('Invalid grid. Rebuilding..')
+            self.initGridPlayer()
 
-    a = findLoc(state, np.array([0,0,0,1])) #find grid position of player (agent)
-    w = findLoc(state, np.array([0,0,1,0])) #find wall
-    g = findLoc(state, np.array([1,0,0,0])) #find goal
-    p = findLoc(state, np.array([0,1,0,0])) #find pit
-    if (not a or not w or not g or not p):
-        #print('Invalid grid. Rebuilding..')
-        return initGridPlayer()
+    #Initialize grid so that goal, pit, wall, player are all randomly placed
+    def initGridRand(self):
+        #height x width x depth (number of pieces)
+        self.board.components['Player'].pos = randPair(0,self.board.size)
+        self.board.components['Goal'].pos = randPair(0,self.board.size)
+        self.board.components['Pit'].pos = randPair(0,self.board.size)
+        self.board.components['Wall'].pos = randPair(0,self.board.size)
 
-    return state
+        if (not self.validateBoard()):
+            #print('Invalid grid. Rebuilding..')
+            self.initGridRand()
 
-#Initialize grid so that goal, pit, wall, player are all randomly placed
-def initGridRand():
-    state = np.zeros((4,4,4))
-    #place player
-    state[randPair(0,4)] = np.array([0,0,0,1])
-    #place wall
-    state[randPair(0,4)] = np.array([0,0,1,0])
-    #place pit
-    state[randPair(0,4)] = np.array([0,1,0,0])
-    #place goal
-    state[randPair(0,4)] = np.array([1,0,0,0])
+    def makeMove(self, action):
+        #need to determine what object (if any) is in the new grid spot the player is moving to
+        #actions in {u,d,l,r}
+        def checkMove(addpos=(0,0)):
+            new_pos = addTuple(self.board.components['Player'].pos, addpos)
+            if new_pos == self.board.components['Wall'].pos:
+                pass #block move, player can't move to wall
+            elif max(new_pos) > (self.board.size-1):    #if outside bounds of board
+                pass
+            elif min(new_pos) < 0: #if outside bounds
+                pass
+            else:
+                self.board.movePiece('Player', new_pos)
+        if action == 'u': #up
+            checkMove((-1,0))
+        elif action == 'd': #down
+            checkMove((1,0))
+        elif action == 'l': #left
+            checkMove((0,-1))
+        elif action == 'r': #right
+            checkMove((0,1))
+        else:
+            pass
 
-    a = findLoc(state, np.array([0,0,0,1]))
-    w = findLoc(state, np.array([0,0,1,0]))
-    g = findLoc(state, np.array([1,0,0,0]))
-    p = findLoc(state, np.array([0,1,0,0]))
-    #If any of the "objects" are superimposed, just call the function again to re-place
-    if (not a or not w or not g or not p):
-        #print('Invalid grid. Rebuilding..')
-        return initGridRand()
+    def getReward(self):
+        if (self.board.components['Player'].pos == self.board.components['Pit'].pos):
+            return -10
+        elif (self.board.components['Player'].pos == self.board.components['Goal'].pos):
+            return 10
+        else:
+            return -1
 
-    return state
-
-def makeMove(state, action):
-    #need to locate player in grid
-    #need to determine what object (if any) is in the new grid spot the player is moving to
-    player_loc = findLoc(state, np.array([0,0,0,1]))
-    wall = findLoc(state, np.array([0,0,1,0]))
-    goal = findLoc(state, np.array([1,0,0,0]))
-    pit = findLoc(state, np.array([0,1,0,0]))
-    state = np.zeros((4,4,4))
-
-    actions = [[-1,0],[1,0],[0,-1],[0,1]]
-    #e.g. up => (player row - 1, player column + 0)
-    new_loc = (player_loc[0] + actions[action][0], player_loc[1] + actions[action][1])
-    if (new_loc != wall):
-        if ((np.array(new_loc) <= (3,3)).all() and (np.array(new_loc) >= (0,0)).all()):
-            state[new_loc][3] = 1
-
-    new_player_loc = findLoc(state, np.array([0,0,0,1]))
-    if (not new_player_loc):
-        state[player_loc] = np.array([0,0,0,1])
-    #re-place pit
-    state[pit][1] = 1
-    #re-place wall
-    state[wall][2] = 1
-    #re-place goal
-    state[goal][0] = 1
-
-    return state
-
-def getLoc(state, level):
-    for i in range(0,4):
-        for j in range(0,4):
-            if (state[i,j][level] == 1):
-                return i,j
-
-def getReward(state):
-    player_loc = getLoc(state, 3)
-    pit = getLoc(state, 1)
-    goal = getLoc(state, 0)
-    if (player_loc == pit):
-        return -10
-    elif (player_loc == goal):
-        return 10
-    else:
-        return -1
-
-def dispGrid(state):
-    grid = np.zeros((4,4), dtype='<U2')
-    player_loc = findLoc(state, np.array([0,0,0,1]))
-    wall = findLoc(state, np.array([0,0,1,0]))
-    goal = findLoc(state, np.array([1,0,0,0]))
-    pit = findLoc(state, np.array([0,1,0,0]))
-    for i in range(0,4):
-        for j in range(0,4):
-            grid[i,j] = ' '
-
-    if player_loc:
-        grid[player_loc] = 'P' #player
-    if wall:
-        grid[wall] = 'W' #wall
-    if goal:
-        grid[goal] = '+' #goal
-    if pit:
-        grid[pit] = '-' #pit
-
-    return grid
+    def dispGrid(self):
+        return self.board.render()
